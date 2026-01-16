@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Safe Paws - Report Incident</title>
   <link rel="stylesheet" href="/css/styles.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 </head>
 <body>
   <div class="container">
@@ -17,24 +19,38 @@
       
       <div class="card">
         <h2>Login with OTP</h2>
+        <p class="text-muted" style="margin-bottom: 20px;">We'll send a 6-digit code to your email</p>
         <form id="otpRequestForm">
           <div class="form-group">
-            <label>Email Address</label>
-            <input type="email" id="emailInput" required placeholder="your@email.com">
+            <label>Email Address *</label>
+            <input type="email" id="emailInput" required placeholder="your@email.com" autocomplete="email">
           </div>
-          <button type="submit" class="btn btn-primary">Send OTP</button>
+          <button type="submit" class="btn btn-primary" id="sendOtpBtn">
+            <span>Send OTP</span>
+          </button>
         </form>
       </div>
 
       <div id="otpVerifySection" class="card" style="display: none;">
         <h2>Enter OTP</h2>
-        <p>Check your email for the 6-digit code</p>
+        <p class="text-muted" style="margin-bottom: 20px;">
+          Check your email <strong id="otpEmailDisplay"></strong> for the 6-digit code
+        </p>
         <form id="otpVerifyForm">
           <div class="form-group">
-            <input type="text" id="otpInput" required placeholder="000000" maxlength="6" pattern="[0-9]{6}">
+            <label>6-Digit Code *</label>
+            <input type="text" id="otpInput" required placeholder="000000" maxlength="6" pattern="[0-9]{6}" autocomplete="one-time-code" style="font-size: 24px; text-align: center; letter-spacing: 8px;">
           </div>
-          <button type="submit" class="btn btn-primary">Verify OTP</button>
+          <button type="submit" class="btn btn-primary" id="verifyOtpBtn">
+            <span>Verify & Login</span>
+          </button>
+          <button type="button" class="btn btn-secondary" id="resendOtpBtn" style="margin-top: 12px; width: 100%;">
+            Resend OTP
+          </button>
         </form>
+        <p class="text-muted text-center" style="margin-top: 16px; font-size: 0.85rem;">
+          OTP expires in <strong id="otpTimer">10:00</strong>
+        </p>
       </div>
     </div>
 
@@ -43,21 +59,24 @@
       <div class="header">
         <h1>🐾 Safe Paws</h1>
         <p id="userEmail"></p>
-        <button id="logoutBtn" class="btn btn-secondary">Logout</button>
       </div>
 
       <div class="card">
-        <h2>Report Incident</h2>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+          <h2 style="margin: 0;">Report Incident</h2>
+          <button id="logoutBtn" class="btn btn-secondary" style="width: auto; padding: 10px 20px;">Logout</button>
+        </div>
+        
         <form id="incidentForm">
           <div class="form-group">
             <label>Incident Type *</label>
             <select id="incidentType" required>
               <option value="">Select type</option>
-              <option value="barking">Excessive Barking</option>
-              <option value="chasing">Chasing Pedestrians</option>
-              <option value="pack_aggression">Pack Aggression</option>
-              <option value="bite">Bite/Attack</option>
-              <option value="other">Other</option>
+              <option value="barking">🔊 Excessive Barking</option>
+              <option value="chasing">🏃 Chasing Pedestrians</option>
+              <option value="pack_aggression">👥 Pack Aggression</option>
+              <option value="bite">🩹 Bite/Attack</option>
+              <option value="other">📝 Other</option>
             </select>
           </div>
 
@@ -65,45 +84,52 @@
             <label>Severity *</label>
             <select id="severity" required>
               <option value="">Select severity</option>
-              <option value="low">Low - Minor concern</option>
-              <option value="medium">Medium - Needs attention</option>
-              <option value="high">High - Urgent action needed</option>
+              <option value="low">🟢 Low - Minor concern</option>
+              <option value="medium">🟡 Medium - Needs attention</option>
+              <option value="high">🔴 High - Urgent action needed</option>
             </select>
           </div>
 
           <div class="form-group">
-            <label>Description</label>
-            <textarea id="description" rows="4" placeholder="Describe what happened..."></textarea>
+            <label>Description (Optional)</label>
+            <textarea id="description" rows="4" placeholder="Describe what happened... (e.g., time, number of dogs, behavior)"></textarea>
           </div>
 
           <div class="form-group">
-            <label>Location</label>
-            <div id="locationInfo" class="location-info">
-              <span id="locationText">Getting location...</span>
-              <button type="button" id="refreshLocation" class="btn btn-secondary">Refresh</button>
+            <label>Location *</label>
+            <div class="location-info">
+              <span id="locationText" class="loading">📍 Getting your location...</span>
+              <button type="button" id="refreshLocation" class="btn btn-secondary">🔄 Refresh</button>
             </div>
+            <div id="map"></div>
           </div>
 
-          <button type="submit" class="btn btn-primary btn-large">Submit Report</button>
+          <button type="submit" class="btn btn-primary btn-large" id="submitIncidentBtn">
+            <span>Submit Report</span>
+          </button>
         </form>
       </div>
 
       <div class="card">
-        <h3>My Recent Reports</h3>
+        <h3>📋 My Recent Reports</h3>
         <div id="recentReports">
-          <p class="text-muted">Loading...</p>
+          <p class="text-muted">Loading your reports...</p>
         </div>
       </div>
     </div>
 
     <!-- Success Screen -->
     <div id="successScreen" class="screen">
-      <div class="success-message">
-        <div class="success-icon">✓</div>
-        <h2>Report Submitted!</h2>
-        <p>Thank you for helping make our community safer.</p>
-        <p class="text-muted">Authorities have been notified and will take appropriate action.</p>
-        <button id="reportAnotherBtn" class="btn btn-primary">Report Another Incident</button>
+      <div class="card">
+        <div class="success-message">
+          <div class="success-icon">✓</div>
+          <h2>Report Submitted Successfully!</h2>
+          <p style="font-size: 1.1rem; margin: 16px 0;">Thank you for helping make our community safer.</p>
+          <p class="text-muted">Authorities have been notified and will take appropriate action based on the incident severity.</p>
+          <button id="reportAnotherBtn" class="btn btn-primary btn-large" style="margin-top: 32px;">
+            Report Another Incident
+          </button>
+        </div>
       </div>
     </div>
   </div>
