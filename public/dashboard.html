@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Safe Paws - Authority Dashboard</title>
   <link rel="stylesheet" href="/css/styles.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
 <body class="dashboard-body">
@@ -18,31 +20,45 @@
       
       <div class="card">
         <h2>Login with OTP</h2>
+        <p class="text-muted" style="margin-bottom: 20px;">Secure access for authorized personnel</p>
         <form id="otpRequestForm">
           <div class="form-group">
-            <label>Email Address</label>
-            <input type="email" id="emailInput" required placeholder="authority@example.com">
+            <label>Email Address *</label>
+            <input type="email" id="emailInput" required placeholder="authority@example.com" autocomplete="email">
           </div>
           <div class="form-group">
-            <label>Role</label>
+            <label>Role *</label>
             <select id="roleSelect" required>
-              <option value="authority">Municipal Authority</option>
-              <option value="ngo">NGO Staff</option>
+              <option value="authority">🏛️ Municipal Authority</option>
+              <option value="ngo">🤝 NGO Staff</option>
             </select>
           </div>
-          <button type="submit" class="btn btn-primary">Send OTP</button>
+          <button type="submit" class="btn btn-primary" id="sendOtpBtn">
+            <span>Send OTP</span>
+          </button>
         </form>
       </div>
 
       <div id="otpVerifySection" class="card" style="display: none;">
         <h2>Enter OTP</h2>
-        <p>Check your email for the 6-digit code</p>
+        <p class="text-muted" style="margin-bottom: 20px;">
+          Check your email <strong id="otpEmailDisplay"></strong> for the 6-digit code
+        </p>
         <form id="otpVerifyForm">
           <div class="form-group">
-            <input type="text" id="otpInput" required placeholder="000000" maxlength="6" pattern="[0-9]{6}">
+            <label>6-Digit Code *</label>
+            <input type="text" id="otpInput" required placeholder="000000" maxlength="6" pattern="[0-9]{6}" autocomplete="one-time-code" style="font-size: 24px; text-align: center; letter-spacing: 8px;">
           </div>
-          <button type="submit" class="btn btn-primary">Verify OTP</button>
+          <button type="submit" class="btn btn-primary" id="verifyOtpBtn">
+            <span>Verify & Login</span>
+          </button>
+          <button type="button" class="btn btn-secondary" id="resendOtpBtn" style="margin-top: 12px; width: 100%;">
+            Resend OTP
+          </button>
         </form>
+        <p class="text-muted text-center" style="margin-top: 16px; font-size: 0.85rem;">
+          OTP expires in <strong id="otpTimer">10:00</strong>
+        </p>
       </div>
     </div>
   </div>
@@ -51,7 +67,7 @@
   <div id="dashboardScreen" class="screen">
     <nav class="navbar">
       <div class="navbar-brand">
-        <h1>🐾 Safe Paws</h1>
+        <h1>🐾 Safe Paws Dashboard</h1>
       </div>
       <div class="navbar-user">
         <span id="userEmail"></span>
@@ -92,14 +108,23 @@
         </div>
       </div>
 
+      <!-- Map View -->
+      <div class="card">
+        <div class="card-header">
+          <h3>🗺️ Hotspot Map</h3>
+          <button id="refreshMap" class="btn btn-secondary">🔄 Refresh</button>
+        </div>
+        <div id="hotspotMap" style="height: 500px; border-radius: 12px;"></div>
+      </div>
+
       <!-- Charts -->
       <div class="charts-grid">
         <div class="card">
-          <h3>Incident Trends (Last 30 Days)</h3>
+          <h3>📈 Incident Trends (Last 30 Days)</h3>
           <canvas id="trendsChart"></canvas>
         </div>
         <div class="card">
-          <h3>Incidents by Type</h3>
+          <h3>📊 Incidents by Type</h3>
           <canvas id="typeChart"></canvas>
         </div>
       </div>
@@ -107,8 +132,8 @@
       <!-- Hotspots Table -->
       <div class="card">
         <div class="card-header">
-          <h3>Active Hotspots</h3>
-          <button id="refreshHotspots" class="btn btn-secondary">Refresh</button>
+          <h3>🔥 Active Hotspots</h3>
+          <button id="refreshHotspots" class="btn btn-secondary">🔄 Refresh</button>
         </div>
         <div class="table-container">
           <table id="hotspotsTable">
@@ -124,7 +149,7 @@
             </thead>
             <tbody id="hotspotsBody">
               <tr>
-                <td colspan="6" class="text-center">Loading...</td>
+                <td colspan="6" class="text-center">Loading hotspots...</td>
               </tr>
             </tbody>
           </table>
@@ -133,9 +158,9 @@
 
       <!-- Recent Incidents -->
       <div class="card">
-        <h3>Recent Incidents</h3>
+        <h3>📋 Recent Incidents</h3>
         <div id="recentIncidents">
-          <p class="text-muted">Loading...</p>
+          <p class="text-muted">Loading incidents...</p>
         </div>
       </div>
     </div>
@@ -154,19 +179,19 @@
           <label>Action Type *</label>
           <select id="actionType" required>
             <option value="">Select action</option>
-            <option value="vaccination">Vaccination</option>
-            <option value="sterilization">Sterilization</option>
-            <option value="monitoring">Monitoring</option>
-            <option value="relocation">Relocation</option>
-            <option value="feeding_program">Feeding Program</option>
-            <option value="other">Other</option>
+            <option value="vaccination">💉 Vaccination</option>
+            <option value="sterilization">🏥 Sterilization</option>
+            <option value="monitoring">👁️ Monitoring</option>
+            <option value="relocation">🚚 Relocation</option>
+            <option value="feeding_program">🍖 Feeding Program</option>
+            <option value="other">📝 Other</option>
           </select>
         </div>
         <div class="form-group">
-          <label>Notes</label>
-          <textarea id="actionNotes" rows="4" placeholder="Describe the action taken..."></textarea>
+          <label>Notes *</label>
+          <textarea id="actionNotes" rows="4" placeholder="Describe the action taken... (e.g., number of dogs, team members, date)" required></textarea>
         </div>
-        <button type="submit" class="btn btn-primary">Submit Action</button>
+        <button type="submit" class="btn btn-primary btn-large">Submit Action</button>
       </form>
     </div>
   </div>
